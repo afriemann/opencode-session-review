@@ -1,0 +1,21 @@
+{
+  "name": "opencode-session-review",
+  "version": "0.1.0",
+  "description": "opencode plugin — per-session capture of recurring agent failure signals into a local findings ledger",
+  "type": "module",
+  "main": "src/plugin.js",
+  "files": ["src"],
+  "scripts": {
+    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.15.0"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  },
+  "license": "MIT"
+}
