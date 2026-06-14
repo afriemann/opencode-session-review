@@ -311,4 +311,58 @@ describe('suspect-fabrication signal', () => {
     expect(result.new).toHaveLength(1);
     expect(result.new[0].signal_type).toBe('suspect-fabrication');
   });
+
+  // ── Boundary: NULL message_id ────────────────────────────────────────────
+  // Documents the known, intentional JOIN exclusion boundary: a text part with
+  // no message_id (or whose message_id has no matching message row) is silently
+  // dropped by the INNER JOIN in extractAssistantTextParts. This is the correct
+  // behaviour given the opencode schema guarantee. If a future query change
+  // converts the JOIN to a LEFT JOIN (or removes it), this test will fail and
+  // alert the author to re-examine the role-filter logic.
+  test('text part with NULL message_id is excluded by JOIN → NO finding', async () => {
+    const sessionId = 'sess-fab-null-msgid';
+    sessionStoreHelper.addSession(sessionId, 'web-researcher', NOW - 10000);
+    // Insert a raw part with no message_id — simulates orphaned / legacy row.
+    // addPart() does not set message_id, so the column is NULL.
+    sessionStoreHelper.addPart(
+      sessionId,
+      { type: 'text', text: 'According to https://example.com the answer is yes.' },
+      NOW - 5000,
+    );
+
+    const result = await cmdCapture(sessionId, BASE_OPTS);
+
+    // The INNER JOIN drops the orphan part → no sourced text found → no finding.
+    expect(result.new).toHaveLength(0);
+    expect(result.new.some((f) => f.signal_type === 'suspect-fabrication')).toBe(false);
+  });
+
+  // ── Boundary: exclusive lower-bound watermark ────────────────────────────
+  // Verifies that a part with time_created === wmPartMs is NOT captured
+  // (the window is `time_created > wmPartMs`, i.e. exclusive lower bound).
+  test('sourced assistant text part exactly at watermark lower bound → NO finding', async () => {
+    const sessionId = 'sess-fab-wm-boundary';
+    const WM = 500000; // arbitrary watermark value
+
+    sessionStoreHelper.addSession(sessionId, 'web-researcher', WM - 10000);
+
+    // Pre-seed the watermark so wmPartMs === WM when cmdCapture reads it.
+    // advanceWatermark writes `last_part_ms = upper` and `last_capture_ms = now`.
+    // We call it directly on the ledger before the capture call.
+    // captureMinIntervalMs=0 so the throttle gate is never active.
+    const { advanceWatermark } = await import('../src/lib/watermark.js');
+    advanceWatermark(currentLedger, sessionId, WM, WM - 1);
+
+    // Part AT the watermark boundary (time_created === WM → excluded by >).
+    sessionStoreHelper.addAssistantTextPart(
+      sessionId,
+      'According to https://example.com the answer is yes.',
+      WM, // exactly at the lower bound — must be excluded
+    );
+
+    const result = await cmdCapture(sessionId, BASE_OPTS);
+
+    expect(result.new).toHaveLength(0);
+    expect(result.new.some((f) => f.signal_type === 'suspect-fabrication')).toBe(false);
+  });
 });
