@@ -106,7 +106,7 @@ node src/capture.js <subcommand> [args]
 |---|---|---|
 | `OPENCODE_DB` | `~/.local/share/opencode/opencode.db` | Path to the opencode session store SQLite database |
 | `FINDINGS_DB` | `~/.local/share/opencode/findings.db` | Path to the local findings ledger SQLite database |
-| `CAPTURE_MIN_INTERVAL_MS` | `30000` (30 s) | Minimum milliseconds between consecutive `capture` runs for the same session (debounce guard) |
+| `CAPTURE_MIN_INTERVAL_MS` | `60000` (60 s) | Minimum milliseconds between consecutive `capture` runs for the same session (debounce guard) |
 
 ---
 
