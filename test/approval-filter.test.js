@@ -251,6 +251,12 @@ describe('filterApprovalToil()', () => {
     expect(result).toHaveLength(0);
   });
 
+  test('Gate 1: command resolving to "deny" (matched deny rule) → dropped', () => {
+    const denyRules = [{ action: 'deny', pattern: 'git *' }];
+    const result = filterApprovalToil(['git status'], denyRules, allowPrefixes, denyShapes);
+    expect(result).toHaveLength(0);
+  });
+
   // Gate 1: command resolves to 'ask' (no matching rule) → proceeds
   test('Gate 1: command resolving to "ask" (no rule matches) → proceeds to gate 2', () => {
     // 'go test ./...' has no matching rule (rules is empty), but 'go' IS in allowPrefixes

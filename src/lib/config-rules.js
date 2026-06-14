@@ -14,7 +14,7 @@
 // temp file and reading it back gives the full ~232 kB output.
 
 import { spawn } from 'node:child_process';
-import { mkdtempSync, mkdtempSync as _mkdtemp, writeFileSync, readFileSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
