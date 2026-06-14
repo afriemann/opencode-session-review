@@ -125,5 +125,72 @@ export function buildSessionStore() {
         timeCreated,
       );
     },
+
+    /**
+     * Insert a webfetch tool part (completed).
+     * Used to simulate a real webfetch call in the time window,
+     * which prevents suspect-fabrication detection.
+     * @param {string} sessionId
+     * @param {string} url
+     * @param {number} [timeCreated]
+     * @returns {string}  the generated part id
+     */
+    addWebfetchCall(sessionId, url, timeCreated = Date.now()) {
+      return this.addPart(
+        sessionId,
+        {
+          type: 'tool',
+          tool: 'webfetch',
+          state: { status: 'completed', input: { url } },
+        },
+        timeCreated,
+      );
+    },
+
+    /**
+     * Insert an assistant text part (with a message row for role='assistant').
+     * The detection query joins part.message_id → message.data->>'$.role'
+     * to isolate the agent's own answer text.
+     * @param {string} sessionId
+     * @param {string} text         - the assistant's answer text
+     * @param {number} [timeCreated]
+     * @returns {string}            the generated part id
+     */
+    addAssistantTextPart(sessionId, text, timeCreated = Date.now()) {
+      // Create the parent message with role='assistant'.
+      const messageId = `msg-${++partSeq}-${Math.random().toString(36).slice(2)}`;
+      db.prepare(
+        'INSERT INTO message (id, session_id, data) VALUES (?, ?, ?)',
+      ).run(messageId, sessionId, JSON.stringify({ role: 'assistant' }));
+
+      // Create the text part linked to that message.
+      const partId = `part-${++partSeq}-${Math.random().toString(36).slice(2)}`;
+      db.prepare(
+        'INSERT INTO part (id, message_id, session_id, time_created, data) VALUES (?, ?, ?, ?, ?)',
+      ).run(partId, messageId, sessionId, timeCreated, JSON.stringify({ type: 'text', text }));
+      return partId;
+    },
+
+    /**
+     * Insert a user text part (with a message row for role='user').
+     * Used to verify that user-prompt URLs are NOT matched by the
+     * suspect-fabrication query (which filters on role='assistant').
+     * @param {string} sessionId
+     * @param {string} text         - the user's message text
+     * @param {number} [timeCreated]
+     * @returns {string}            the generated part id
+     */
+    addUserTextPart(sessionId, text, timeCreated = Date.now()) {
+      const messageId = `msg-${++partSeq}-${Math.random().toString(36).slice(2)}`;
+      db.prepare(
+        'INSERT INTO message (id, session_id, data) VALUES (?, ?, ?)',
+      ).run(messageId, sessionId, JSON.stringify({ role: 'user' }));
+
+      const partId = `part-${++partSeq}-${Math.random().toString(36).slice(2)}`;
+      db.prepare(
+        'INSERT INTO part (id, message_id, session_id, time_created, data) VALUES (?, ?, ?, ?, ?)',
+      ).run(partId, messageId, sessionId, timeCreated, JSON.stringify({ type: 'text', text }));
+      return partId;
+    },
   };
 }

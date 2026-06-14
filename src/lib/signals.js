@@ -119,3 +119,55 @@ export function getSessionAgent(sessionStore, sessionId) {
     .get(sessionId);
   return (row && row.agent) || null;
 }
+
+/**
+ * Count webfetch tool-call parts in a session's time window.
+ * Counts ALL webfetch parts regardless of status: a fabrication makes zero calls;
+ * a real fetch that errored still proves the agent tried to fetch.
+ *
+ * @param {import('node:sqlite').DatabaseSync} sessionStore
+ * @param {string} sessionId
+ * @param {number} wmPartMs  - lower bound (exclusive)
+ * @param {number} upperMs   - upper bound (inclusive)
+ * @returns {number}         total count of webfetch parts in the window
+ */
+export function countWebfetchCalls(sessionStore, sessionId, wmPartMs, upperMs) {
+  const row = sessionStore
+    .prepare(
+      `SELECT COUNT(*) AS n
+         FROM part
+        WHERE session_id = ?
+          AND time_created > ? AND time_created <= ?
+          AND json_extract(data, '$.type') = 'tool'
+          AND json_extract(data, '$.tool') = 'webfetch'`
+    )
+    .get(sessionId, wmPartMs, upperMs);
+  return row ? Number(row.n) : 0;
+}
+
+/**
+ * Collect assistant text parts in a session's time window.
+ * Joins to the message table to filter only role='assistant' parts,
+ * ensuring user-prompt text (which may also contain URLs) is excluded.
+ *
+ * @param {import('node:sqlite').DatabaseSync} sessionStore
+ * @param {string} sessionId
+ * @param {number} wmPartMs  - lower bound (exclusive)
+ * @param {number} upperMs   - upper bound (inclusive)
+ * @returns {string[]}       array of text strings from assistant parts
+ */
+export function extractAssistantTextParts(sessionStore, sessionId, wmPartMs, upperMs) {
+  const rows = sessionStore
+    .prepare(
+      `SELECT json_extract(p.data, '$.text') AS txt
+         FROM part p
+         JOIN message m ON p.message_id = m.id
+        WHERE p.session_id = ?
+          AND p.time_created > ? AND p.time_created <= ?
+          AND json_extract(p.data, '$.type') = 'text'
+          AND json_extract(m.data, '$.role') = 'assistant'
+          AND json_extract(p.data, '$.text') IS NOT NULL`
+    )
+    .all(sessionId, wmPartMs, upperMs);
+  return rows.map((r) => r.txt || '').filter(Boolean);
+}

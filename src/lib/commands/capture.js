@@ -18,6 +18,8 @@ import {
   extractPermissionRejects,
   extractBashCommands,
   getSessionAgent,
+  countWebfetchCalls,
+  extractAssistantTextParts,
 } from '../signals.js';
 import { agentBashRules } from '../config-rules.js';
 
@@ -32,6 +34,7 @@ import { agentBashRules } from '../config-rules.js';
  * @param {string[]} opts.excludedAgents        - agent names to skip
  * @param {string[]} opts.approvalAllowPrefixes - first-token allowlist
  * @param {string[]} opts.approvalDenyShapes    - destructive phrase denylist
+ * @param {string[]} opts.fabricationAgents     - agents to check for suspect-fabrication
  * @returns {Promise<{ new: object[], open_others: object[], skipped?: string }>}
  */
 export async function cmdCapture(sessionId, opts) {
@@ -42,6 +45,7 @@ export async function cmdCapture(sessionId, opts) {
     excludedAgents,
     approvalAllowPrefixes,
     approvalDenyShapes,
+    fabricationAgents,
   } = opts;
 
   const { ledger, sessionStore } = openDatabases({
@@ -136,6 +140,51 @@ export async function cmdCapture(sessionId, opts) {
           signalType: 'approval-toil',
           agent,
           tool: 'bash',
+          description: desc,
+          severity: sev,
+          fingerprint: fp,
+          sessionId,
+          nowMs: now,
+        });
+        if (isNew) newIds.push(id);
+      }
+    }
+  }
+
+  // ── Suspect-fabrication pass ──────────────────────────────────────────────
+  // Only paid for sessions whose agent is in the fabricationAgents list.
+  // Detects: assistant answer cites sources (URL / Sources heading) but zero
+  // webfetch calls were made in the time window — typical of training-data
+  // answers dressed up as sourced research.
+  if (Array.isArray(fabricationAgents) && fabricationAgents.includes(agent)) {
+    const fetchCount = countWebfetchCalls(sessionStore, sessionId, wmPartMs, upper);
+
+    if (fetchCount === 0) {
+      const assistantTexts = extractAssistantTextParts(
+        sessionStore,
+        sessionId,
+        wmPartMs,
+        upper
+      );
+
+      const looksSourced = (text) =>
+        /https?:\/\//i.test(text) ||
+        /###\s*sources/i.test(text) ||
+        /\|\s*url\s*\|/i.test(text);
+
+      const anyLooksSourced = assistantTexts.some(looksSourced);
+
+      if (anyLooksSourced) {
+        const stableDescriptor = 'no webfetch calls but answer cites sources';
+        const norm = normalise(stableDescriptor);
+        const sev = classifySeverity(norm);
+        const fp = fingerprintOf('suspect-fabrication', agent, 'webfetch', norm);
+        const desc =
+          `suspect-fabrication [webfetch] @${agent}: answer cited sources with zero webfetch calls this session`;
+        const { isNew, id } = upsertSignal(ledger, {
+          signalType: 'suspect-fabrication',
+          agent,
+          tool: 'webfetch',
           description: desc,
           severity: sev,
           fingerprint: fp,

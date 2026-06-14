@@ -65,6 +65,9 @@ const APPROVAL_DENY_SHAPES = [
   'docker system prune *', 'docker volume rm *', 'docker rm *', 'docker rmi *',
 ];
 
+// Research-style agents to check for suspect-fabrication (cites sources without webfetch).
+const FABRICATION_AGENTS = ['web-researcher'];
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function die(msg) {
@@ -145,6 +148,7 @@ Env:
           excludedAgents: EXCLUDED_AGENTS,
           approvalAllowPrefixes: APPROVAL_ALLOW_PREFIXES,
           approvalDenyShapes: APPROVAL_DENY_SHAPES,
+          fabricationAgents: FABRICATION_AGENTS,
         });
       } catch (err) {
         die(err.message || String(err));
