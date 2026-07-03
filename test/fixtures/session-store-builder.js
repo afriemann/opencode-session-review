@@ -14,6 +14,7 @@ export function buildSessionStore() {
     CREATE TABLE session (
       id TEXT PRIMARY KEY,
       agent TEXT,
+      title TEXT,
       time_created INTEGER
     );
     CREATE TABLE part (
@@ -40,11 +41,13 @@ export function buildSessionStore() {
      * @param {string} id
      * @param {string} agent
      * @param {number} [timeCreated]
+     * @param {string} [title]
      */
-    addSession(id, agent, timeCreated = Date.now()) {
-      db.prepare('INSERT INTO session (id, agent, time_created) VALUES (?, ?, ?)').run(
+    addSession(id, agent, timeCreated = Date.now(), title = null) {
+      db.prepare('INSERT INTO session (id, agent, title, time_created) VALUES (?, ?, ?, ?)').run(
         id,
         agent,
+        title,
         timeCreated,
       );
     },

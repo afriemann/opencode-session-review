@@ -18,12 +18,12 @@ describe('buildDedupPrompt()', () => {
 
   test('contains "NEW" section header', () => {
     const prompt = buildDedupPrompt(freshFindings, existingFindings);
-    expect(prompt).toContain('NEW');
+    expect(prompt).toContain('NEW:');
   });
 
   test('contains "EXISTING" section header', () => {
     const prompt = buildDedupPrompt(freshFindings, existingFindings);
-    expect(prompt).toContain('EXISTING');
+    expect(prompt).toContain('EXISTING:');
   });
 
   test('contains serialised JSON of fresh findings', () => {
@@ -36,10 +36,13 @@ describe('buildDedupPrompt()', () => {
     expect(prompt).toContain(JSON.stringify(existingFindings));
   });
 
-  test('instructs reply format (JSON array)', () => {
+  test('data-only: does NOT contain task instructions or reply-format prose', () => {
     const prompt = buildDedupPrompt(freshFindings, existingFindings);
-    expect(prompt).toContain('new_id');
-    expect(prompt).toContain('duplicate_of');
+    // Instructions live in body.system (src/prompts/deduper.md), not here.
+    expect(prompt).not.toContain('Deduplicate');
+    expect(prompt).not.toContain('Reply with ONLY');
+    expect(prompt).not.toContain('duplicate_of');
+    expect(prompt).not.toContain('new_id');
   });
 
   test('works with empty arrays', () => {

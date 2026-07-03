@@ -56,7 +56,8 @@ const BASE_OPTS = {
   openCodeDb: ':memory:',
   findingsDb: ':memory:',
   captureMinIntervalMs: 0,   // disable throttle for most tests
-  excludedAgents: ['agent-engineer', 'session-finding-deduper'],
+  excludedAgents: ['agent-engineer'],
+  skipTitles: ['session-finding dedup'],
   approvalAllowPrefixes: ['go', 'gh', 'git', 'npm'],
   approvalDenyShapes: ['git push *', 'git commit *'],
 };
@@ -214,5 +215,58 @@ describe('cmdCapture()', () => {
     const result2 = await cmdCapture(sessionId2, BASE_OPTS);
     // The finding already exists, so it's not reported as new
     expect(result2.new).toHaveLength(0);
+  });
+
+  // ── Title-marker recursion guard (layer 2) ──────────────────────────────────
+
+  test('session-finding-deduper is NOT excluded by agent name (title-marker used instead)', async () => {
+    // After the inline-deduper migration, 'session-finding-deduper' is no longer
+    // in EXCLUDED_AGENTS; dedup sessions are identified by title marker instead.
+    const sessionId = 'sess-deduper-agent';
+    sessionStoreHelper.addSession(sessionId, 'session-finding-deduper', NOW - 10000);
+    sessionStoreHelper.addToolError(sessionId, 'bash', 'some error', NOW - 5000);
+
+    const result = await cmdCapture(sessionId, BASE_OPTS);
+
+    expect(result.skipped).toBeUndefined();
+    expect(result.new).toHaveLength(1);
+  });
+
+  test('session with title "session-finding dedup" → returns { skipped: "excluded-title" }', async () => {
+    const sessionId = 'sess-dedup-title';
+    sessionStoreHelper.addSession(sessionId, 'default-agent', NOW - 10000, 'session-finding dedup');
+    sessionStoreHelper.addToolError(sessionId, 'bash', 'some error', NOW - 5000);
+
+    const result = await cmdCapture(sessionId, BASE_OPTS);
+
+    expect(result.skipped).toBe('excluded-title');
+    expect(result.new).toHaveLength(0);
+    expect(result.open_others).toHaveLength(0);
+  });
+
+  test('session with different title → NOT skipped by title-marker', async () => {
+    const sessionId = 'sess-other-title';
+    sessionStoreHelper.addSession(sessionId, 'dev-agent', NOW - 10000, 'my build session');
+    sessionStoreHelper.addToolError(sessionId, 'bash', 'some error', NOW - 5000);
+
+    const result = await cmdCapture(sessionId, BASE_OPTS);
+
+    expect(result.skipped).toBeUndefined();
+    expect(result.new).toHaveLength(1);
+  });
+
+  test('skipTitles undefined → title-marker check is skipped entirely', async () => {
+    const sessionId = 'sess-no-skip-titles';
+    sessionStoreHelper.addSession(sessionId, 'dev-agent', NOW - 10000, 'session-finding dedup');
+    sessionStoreHelper.addToolError(sessionId, 'bash', 'some error', NOW - 5000);
+
+    // Omitting skipTitles: even a "session-finding dedup" title is NOT skipped.
+    const result = await cmdCapture(sessionId, {
+      ...BASE_OPTS,
+      skipTitles: undefined,
+    });
+
+    expect(result.skipped).toBeUndefined();
+    expect(result.new).toHaveLength(1);
   });
 });

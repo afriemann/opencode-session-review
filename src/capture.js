@@ -49,7 +49,13 @@ const CAPTURE_MIN_INTERVAL_MS = (() => {
 })();
 
 // Agents whose sessions must never be analysed (recursion guard).
-const EXCLUDED_AGENTS = ['agent-engineer', 'session-finding-deduper'];
+// session-finding-deduper has been removed: its sessions are now identified
+// by title marker (see SKIP_TITLES below) rather than by agent name.
+const EXCLUDED_AGENTS = ['agent-engineer'];
+
+// Session titles to skip (title-marker recursion guard, layer 2).
+// Matches the title set on ephemeral dedup sessions spawned by the plugin.
+const SKIP_TITLES = ['session-finding dedup'];
 
 // First-token allowlist for approval-toil candidates.
 const APPROVAL_ALLOW_PREFIXES = [
@@ -146,6 +152,7 @@ Env:
           findingsDb: FINDINGS_DB,
           captureMinIntervalMs: CAPTURE_MIN_INTERVAL_MS,
           excludedAgents: EXCLUDED_AGENTS,
+          skipTitles: SKIP_TITLES,
           approvalAllowPrefixes: APPROVAL_ALLOW_PREFIXES,
           approvalDenyShapes: APPROVAL_DENY_SHAPES,
           fabricationAgents: FABRICATION_AGENTS,

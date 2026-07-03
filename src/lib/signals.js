@@ -121,6 +121,20 @@ export function getSessionAgent(sessionStore, sessionId) {
 }
 
 /**
+ * Get the title for a session.
+ *
+ * @param {import('node:sqlite').DatabaseSync} sessionStore
+ * @param {string} sessionId
+ * @returns {string | null}
+ */
+export function getSessionTitle(sessionStore, sessionId) {
+  const row = sessionStore
+    .prepare('SELECT title FROM session WHERE id = ?')
+    .get(sessionId);
+  return (row && row.title) || null;
+}
+
+/**
  * Count webfetch tool-call parts in a session's time window.
  * Counts ALL webfetch parts regardless of status: a fabrication makes zero calls;
  * a real fetch that errored still proves the agent tried to fetch.

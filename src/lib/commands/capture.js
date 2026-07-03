@@ -18,6 +18,7 @@ import {
   extractPermissionRejects,
   extractBashCommands,
   getSessionAgent,
+  getSessionTitle,
   countWebfetchCalls,
   extractAssistantTextParts,
 } from '../signals.js';
@@ -32,6 +33,7 @@ import { agentBashRules } from '../config-rules.js';
  * @param {string}   opts.findingsDb            - path to findings ledger
  * @param {number}   opts.captureMinIntervalMs  - throttle interval in ms (0 = disabled)
  * @param {string[]} opts.excludedAgents        - agent names to skip
+ * @param {string[]} [opts.skipTitles]          - session titles to skip (title-marker guard)
  * @param {string[]} opts.approvalAllowPrefixes - first-token allowlist
  * @param {string[]} opts.approvalDenyShapes    - destructive phrase denylist
  * @param {string[]} opts.fabricationAgents     - agents to check for suspect-fabrication
@@ -43,6 +45,7 @@ export async function cmdCapture(sessionId, opts) {
     findingsDb,
     captureMinIntervalMs,
     excludedAgents,
+    skipTitles,
     approvalAllowPrefixes,
     approvalDenyShapes,
     fabricationAgents,
@@ -62,6 +65,17 @@ export async function cmdCapture(sessionId, opts) {
   }
   if (excludedAgents.includes(agent)) {
     return { new: [], open_others: [], skipped: 'excluded-agent' };
+  }
+
+  // Title-marker guard (layer 2 of the dedup sub-session recursion guard):
+  // skip sessions whose title matches a known internal-tool marker. This covers
+  // the case where the plugin process restarts between spawning a dedup session
+  // and its idle event, leaving the in-memory Set unable to recognise it.
+  if (Array.isArray(skipTitles) && skipTitles.length > 0) {
+    const title = getSessionTitle(sessionStore, sessionId);
+    if (title && skipTitles.includes(title)) {
+      return { new: [], open_others: [], skipped: 'excluded-title' };
+    }
   }
 
   const now = Date.now();
