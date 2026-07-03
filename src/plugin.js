@@ -52,6 +52,20 @@ const DEDUP_MODEL = process.env.DEDUP_MODEL || 'github-copilot/gpt-5-mini';
 // re-checks authoritatively against the session store.
 const EXCLUDED_AGENTS = new Set(['agent-engineer']);
 
+// Session titles that identify ephemeral sub-sessions from other plugins.
+// These sessions run as the default agent (no named agent field), so
+// EXCLUDED_AGENTS cannot catch them — a title check is the only option.
+// The layer-2 capture-script guard (SKIP_TITLES in src/capture.js) must
+// list these same titles for defence-in-depth.
+//
+//   'session-finding dedup'  = this plugin's own dedup sub-sessions.
+//                              Primarily caught by dedupSessions Set (layer 1),
+//                              but defence-in-depth via title check too.
+//   'agent-memory distil'    = opencode-agent-memory ephemeral distil sessions.
+//                              Must match EPHEMERAL_TITLE in that plugin's
+//                              src/plugin.js.
+const SKIP_TITLES_FAST = new Set(['session-finding dedup', 'agent-memory distil']);
+
 // Upper bound on the in-flight session set. At this many distinct sessions
 // queued at once, a further idle is dropped (and re-fires on the session's next
 // idle) rather than evicting an active marker. Entries clear as each capture
@@ -131,13 +145,22 @@ export const SessionReviewCapture = async ({ client, $ }) => {
     console.error(`[session-review-capture] ${msg}${err ? `: ${err}` : ''}`);
 
   const handle = async (sessionID) => {
-    // Cheap pre-guard: skip excluded agents without spawning a subprocess.
+    // Cheap pre-guard: skip excluded agents and known ephemeral sub-sessions
+    // before spending a subprocess.
     try {
       const got = await client.session.get({ sessionID });
       const agent = got && got.data && got.data.agent;
       if (agent && EXCLUDED_AGENTS.has(agent)) return;
+      // Skip ephemeral sub-sessions identified by title. These sessions run as
+      // the default agent (no `agent` field), so EXCLUDED_AGENTS cannot catch
+      // them. On API failure the try/catch falls through, and the authoritative
+      // layer-2 title guard in the capture script provides the safety net.
+      const title = got && got.data && got.data.title;
+      if (title && SKIP_TITLES_FAST.has(title)) return;
     } catch {
-      // Non-fatal: fall through to the script, which guards authoritatively.
+      // Non-fatal: fall through to the script, which guards authoritatively
+      // against excluded named agents. Title-based exclusions (e.g.,
+      // agent-memory distil sessions) only fire on the happy path above.
     }
 
     // 1. Deterministic capture (free, no LLM).

@@ -24,10 +24,10 @@ async function makePlugin(overrides = {}) {
   return { plugin, $, client };
 }
 
-function makeDefaultClient({ agent = 'some-agent', sessionCreateId = 'dedup-session-id' } = {}) {
+function makeDefaultClient({ agent = 'some-agent', title = null, sessionCreateId = 'dedup-session-id' } = {}) {
   return {
     session: {
-      get:    jest.fn().mockResolvedValue({ data: { agent } }),
+      get:    jest.fn().mockResolvedValue({ data: { agent, title } }),
       create: jest.fn().mockResolvedValue({ data: { id: sessionCreateId } }),
       prompt: jest.fn().mockResolvedValue({
         data: { parts: [{ type: 'text', text: '[]' }] },
@@ -501,6 +501,31 @@ describe('SessionReviewCapture plugin', () => {
     const { plugin } = await makePlugin({ $, client });
     await expect(plugin.event(idleEvent('sess-del-err'))).resolves.toBeUndefined();
     // Just the one capture call; delete error was swallowed
+    expect($).toHaveBeenCalledTimes(1);
+  });
+
+  // ── Cross-plugin title guard (agent-memory distil) ──────────────────────────
+
+  test('agent-memory distil session (title="agent-memory distil", no named agent) → $ never called', async () => {
+    // Ephemeral distil sub-sessions spawned by opencode-agent-memory run as
+    // the default agent (no `agent` field) and are identified by title.
+    // session-review must NOT capture them.
+    const client = makeDefaultClient({ agent: undefined, title: 'agent-memory distil' });
+    const { plugin, $ } = await makePlugin({ client });
+    await plugin.event(idleEvent('distil-sess'));
+    expect($).not.toHaveBeenCalled();
+  });
+
+  test('default-agent session with a non-distil title is still captured', async () => {
+    // A real build session that happens to have no named agent must NOT be
+    // incorrectly skipped by the title-based guard.
+    const captureJson = JSON.stringify({ new: [], open_others: [] });
+    const client = makeDefaultClient({ agent: undefined, title: 'my build session' });
+    const $ = jest.fn(() => ({
+      quiet: () => ({ text: () => Promise.resolve(captureJson) }),
+    }));
+    const { plugin } = await makePlugin({ client, $ });
+    await plugin.event(idleEvent('regular-sess'));
     expect($).toHaveBeenCalledTimes(1);
   });
 });
