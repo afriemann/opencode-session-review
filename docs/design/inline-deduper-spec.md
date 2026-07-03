@@ -282,3 +282,7 @@ For `body.format = { type: "json_schema", schema: <this>, retryCount: 2 }`:
   }
 }
 ```
+
+## Future Enhancements
+
+- **Make the dedup model configurable via a JSONC file in the opencode config directory.** The inline dedup model is currently pinned by the `DEDUP_MODEL` plugin env var (default `github-copilot/gpt-5-mini`). A future enhancement should let the plugin read its model choice from a dedicated, plugin-owned JSONC file under the opencode config directory (`~/.config/opencode/`) — **not** the central `opencode.jsonc` itself — so the model can be set as configuration rather than an environment variable while keeping the plugin's settings separate from opencode's own config.
