@@ -49,7 +49,18 @@ const CAPTURE_MIN_INTERVAL_MS = (() => {
 })();
 
 // Agents whose sessions must never be analysed (recursion guard).
-const EXCLUDED_AGENTS = ['agent-engineer', 'session-finding-deduper'];
+// session-finding-deduper has been removed: its sessions are now identified
+// by title marker (see SKIP_TITLES below) rather than by agent name.
+const EXCLUDED_AGENTS = ['agent-engineer'];
+
+// Session titles to skip (title-marker recursion/cross-plugin guard, layer 2).
+// Provides defence-in-depth for the event-handler title check in plugin.js.
+//
+//   'session-finding dedup' = ephemeral dedup sessions spawned by this plugin.
+//   'agent-memory distil'   = ephemeral distil sub-sessions from the
+//                             opencode-agent-memory plugin (run as the default
+//                             agent, so EXCLUDED_AGENTS cannot catch them).
+const SKIP_TITLES = ['session-finding dedup', 'agent-memory distil'];
 
 // First-token allowlist for approval-toil candidates.
 const APPROVAL_ALLOW_PREFIXES = [
@@ -146,6 +157,7 @@ Env:
           findingsDb: FINDINGS_DB,
           captureMinIntervalMs: CAPTURE_MIN_INTERVAL_MS,
           excludedAgents: EXCLUDED_AGENTS,
+          skipTitles: SKIP_TITLES,
           approvalAllowPrefixes: APPROVAL_ALLOW_PREFIXES,
           approvalDenyShapes: APPROVAL_DENY_SHAPES,
           fabricationAgents: FABRICATION_AGENTS,

@@ -48,7 +48,7 @@ const BASE_OPTS = {
   openCodeDb: ':memory:',
   findingsDb: ':memory:',
   captureMinIntervalMs: 0,
-  excludedAgents: ['agent-engineer', 'session-finding-deduper'],
+  excludedAgents: ['agent-engineer'],
   approvalAllowPrefixes: ['go', 'gh', 'git', 'npm'],
   approvalDenyShapes: ['git push *', 'git commit *'],
   fabricationAgents: ['web-researcher'],

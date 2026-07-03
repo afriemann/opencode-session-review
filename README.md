@@ -102,11 +102,26 @@ node src/capture.js <subcommand> [args]
 
 ## Environment variables
 
+
 | Variable | Default | Description |
 |---|---|---|
 | `OPENCODE_DB` | `~/.local/share/opencode/opencode.db` | Path to the opencode session store SQLite database |
 | `FINDINGS_DB` | `~/.local/share/opencode/findings.db` | Path to the local findings ledger SQLite database |
 | `CAPTURE_MIN_INTERVAL_MS` | `60000` (60 s) | Minimum milliseconds between consecutive `capture` runs for the same session (debounce guard) |
+| `DEDUP_MODEL` | `github-copilot/gpt-5-mini` | Model for the inline semantic-dedup call, in `providerID/modelID` format. Takes effect on the next opencode server restart. |
+
+---
+
+### Inline dedup model call
+
+The semantic-dedup step no longer uses a named opencode agent. Instead, the
+plugin makes an inline `session.prompt` call using:
+
+- **System prompt**: `src/prompts/deduper.md` (loaded at plugin startup).
+- **Model**: `DEDUP_MODEL` env var (default `github-copilot/gpt-5-mini`).
+- **Output format**: `json_schema` for structured output, with `parseDedupReply`
+  as a tolerant text-parse fallback in case the provider does not honour structured
+  output.
 
 ---
 
